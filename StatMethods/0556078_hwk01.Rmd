@@ -1,0 +1,119 @@
+---
+title: "Homework #1 StatisticalMethods"
+author: "kaichi-yang"
+date: "September 26, 2016"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Question 1:
+done.
+
+#### Questoin 2:
+a. use `R.version.string` to check the version of R.
+```{r}
+# my R version is 3.3.1
+R.version.string
+```
+b. 
+```{r}
+v <- c(2.23, 3.45, 1.87, 2.11, 7.33)
+mean(v)
+```
+c. 
+```{r}
+tmp_sum <- 0
+for(i in c(1:25)){
+  tmp_sum <- tmp_sum + i^2
+}
+tmp_sum
+```
+d. 
+```{r}
+class(cars)
+```
+e. 
+```{r}
+nrow(cars)
+```
+f. 
+```{r}
+colnames(cars)[2]
+```
+g. 
+```{r}
+mean(cars[,2])
+```
+h. 
+```{r}
+which(cars$dist == 85)
+```
+
+#### Question 3:
+a. done
+b. done
+c. 
+```{r}
+f <- read.csv("femaleMiceWeights.csv")
+f
+```
+d. 
+```{r}
+f[12, 2]
+```
+e. 
+```{r}
+f$Bodyweight[11]
+```
+f.
+```{r}
+nrow(f)
+```
+g. 
+```{r}
+v <- seq(3, 7)
+v
+
+mean(f[f$Diet == "hf", 2])
+```
+h. 
+```{R}
+set.seed(1)
+sample(f[13:24,2],1)
+```
+
+#### Question 3:
+a. done
+b. done
+c.
+```{r}
+f <- read.csv("msleep_ggplot2.csv")
+class(f)
+```
+d. 
+```{r}
+library(dplyr)
+nrow(filter(f, order=="Primates"))
+# following command can also do the same task
+# sum(f$order == "Primates") 
+```
+e. 
+```{r}
+class(filter(f, order=="Primates"))
+```
+f. 
+```{r}
+filter(f, order=="Primates") %>% select(sleep_total)
+filter(f, order=="Primates") %>% select(sleep_total) %>% class()
+```
+g. 
+```{r}
+mean(unlist(filter(f, order=="Primates") %>% select(sleep_total)))
+```
+h.
+```{r}
+summarise(filter(f, order=="Primates"), mean(sleep_total))
+```
