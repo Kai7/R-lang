@@ -1,0 +1,418 @@
+---
+title: 'Lecture 4: Inferences'
+output: html_document
+date: "2016/10/05"
+---
+
+# Confidence intervals
+
+## RMD_example 4.1: Construct a confidence interval for the population mean of control female mice
+
+```{r}
+dat <- read.csv("mice_pheno.csv")
+chowPopulation <- dat[dat$Sex=="F" & dat$Diet=="chow",3]
+```
+
+The population mean $\mu_{X}$ is our parameter of interest here:
+
+```{r}
+mu_chow <- mean(chowPopulation)
+print(mu_chow)
+```
+
+We are interested in estimating this parameter. In practice, we do not get to see the entire population so we demonstrate how we can use samples to do this. Let’s start with a sample of size 30:
+
+```{r}
+N <- 30
+chow <- sample(chowPopulation,N)
+print(mean(chow))
+```
+
+We know this is **one observed value** of the random variable, so the sample mean will not be a perfect estimate. In fact, because in this illustrative example we know the value of the parameter, we can see that they are not exactly the same. A confidence interval is a statistical way of reporting our finding, the sample average, in a way that explicitly summarizes the variability of our random variable.
+
+With a sample size of 30, we will use the CLT. The CLT tells us that $\bar{X}$ or `mean(chow)` follows a normal distribution with mean $\mu_{X}$ or `mean(chowPopulation)` and standard error approximately $s_{X}/\sqrt{N}$ or
+
+```{r}
+se <- sd(chow)/sqrt(N)
+print(se)
+```
+
+A 95% confidence interval is a random interval with a 95% probability of falling on the parameter we are estimating. Let’s demonstrate this logic through simulation. We can construct this interval with R relatively easily:
+
+```{r}
+Q <- qnorm(1- 0.025) # the upper 2.5 percentage point of N(0,1) 
+interval <- c(mean(chow)-Q*se, mean(chow)+Q*se )
+interval
+interval[1] < mu_chow & interval[2] > mu_chow
+```
+
+which happens to cover $\mu_{X}$ or `mean(chowPopulation)`. However, we can take another sample and
+we might not be as lucky. In fact, the theory tells us that we will cover $\mu_{X}$ 95% of the time. Because we have access to the population data, we can confirm this by taking several new samples:
+
+```{r}
+library(rafalib)
+B <- 250
+mypar()
+plot(mean(chowPopulation)+c(-7,7),c(1,1),type="n",xlab="weight",ylab="interval",ylim=c(1,B))
+abline(v=mean(chowPopulation))
+total <- 0
+for (i in 1:B) {
+  chow <- sample(chowPopulation,N)
+  se <- sd(chow)/sqrt(N)
+  interval <- c(mean(chow)-Q*se, mean(chow)+Q*se)
+  covered <- mean(chowPopulation) <= interval[2] & mean(chowPopulation) >= interval[1]
+  color <- ifelse(covered,1,2)
+  lines(interval, c(i,i),col=color)
+  total <- total + (color-1)
+}
+
+# the proprtion that the inveral fails to cover the population mean
+print(total/B) 
+```
+
+You can see that in about 5% of the cases, we fail to cover $\mu_{X}$.
+
+## RMD_example 4.2: CI when small sample size
+
+We use the CLT to create our confidence intervals, and with `N`𝑁=5 it may not be as useful an approximation:
+
+```{r}
+mypar()
+plot(mean(chowPopulation)+c(-7,7),c(1,1),type="n",xlab="weight",ylab="interval",ylim=c(1,B))
+abline(v=mean(chowPopulation))
+Q <- qnorm(1-0.025)
+N <- 5
+total <- 0
+for (i in 1:B) {
+  chow <- sample(chowPopulation,N)
+  se <- sd(chow)/sqrt(N)
+  interval <- c(mean(chow)-Q*se, mean(chow)+Q*se)
+  covered <- mean(chowPopulation) <= interval[2] & mean(chowPopulation) >= interval[1]
+  color <- ifelse(covered,1,2)
+  lines(interval, c(i,i),col=color)
+  total <- total + (color-1)
+}
+
+# the proprtion that the inveral fails to cover the population mean
+print(total/B) 
+```
+
+Despite the intervals being larger (we are dividing by $\sqrt{5}$ instead of $\sqrt{30}$), we see many more intervals not covering $\mu_{X}$. This is because the CLT is incorrectly telling us that the distribution of the `mean(chow)` is approximately normal when, in fact, it has a fatter tail (the parts of the distribution going to $\pm\infty$). This mistake affects us in the calculation of `Q`, which assumes a normal distribution and uses `qnorm`. The t-distribution might be more appropriate because the control mouse population is normally distributed. All we have to do is re-run the above, but change how we calculate Q to use `qt` instead of `qnorm`.
+
+```{r}
+mypar()
+plot(mean(chowPopulation) + c(-7,7), c(1,1), type="n",xlab="weight", ylab="interval", ylim=c(1,B))
+abline(v=mean(chowPopulation))
+##Q <- qnorm(1- 0.05/2) ## no longer normal so use:
+Q <- qt(1-0.025, df=4)
+N <- 5
+total <- 0
+for (i in 1:B) {
+  chow <- sample(chowPopulation, N)
+  se <- sd(chow)/sqrt(N)
+  interval <- c(mean(chow)-Q*se, mean(chow)+Q*se )
+  covered <- mean(chowPopulation) <= interval[2] & mean(chowPopulation) >= interval[1]
+  color <- ifelse(covered,1,2)
+  lines(interval, c(i,i),col=color)
+ total <- total + (color-1)
+}
+
+# the proprtion that the inveral fails to cover the population mean
+print(total/B) 
+```
+
+Now the intervals are made bigger. This is because the t-distribution has fatter tails and therefore
+
+```{r}
+qt(1-0.025, df=4)
+```
+
+is bigger than
+
+```{r}
+qnorm(1-0.025)
+```
+
+which makes the intervals larger and hence cover $\mu_{X}$ more frequently; in fact, about 95% of the time.
+
+# Hypothesis testing
+
+## RMD_example 4.3: Null distribution of t-statistics
+
+We begin by loading experimental data and then calculate the observed t-statistic.
+
+```{r}
+library(dplyr)
+dat <- read.csv("femaleMiceWeights.csv") # previously downloaded
+obs_control <- filter(dat,Diet=="chow") %>% select(Bodyweight) %>% unlist
+obs_treatment <- filter(dat,Diet=="hf") %>% select(Bodyweight) %>% unlist
+
+# a function for calculating the t-statistic
+tstat <- function(x, y) {
+  diff <- mean(x) - mean(y)
+  diffse <- sqrt(var(x)/length(x) + var(y)/length(y))
+  t <- diff/diffse
+  t
+}
+
+obststat <- tstat(obs_treatment, obs_control)
+print(obststat)
+```
+
+We have access to the control population `chowPopulation`.
+Let's randomly sample 24 control mice, giving them the same diet, and then record the t-statistic between two randomly split groups of 12 and 12. 
+
+```{r}
+N <- 12
+# 12 control mice
+control <- sample(chowPopulation, N)
+# another 12 control mice that we act as if they were not
+treatment <- sample(chowPopulation, N)
+
+tstat(treatment, control)
+```
+
+Let's do it 10,000 times using a "for-loop"
+
+```{r}
+N <- 12
+B <- 10000
+null <- vector("numeric", B)
+for (i in 1:B) 
+{
+    control <- sample(chowPopulation,N)
+    treatment <- sample(chowPopulation,N)
+    null[i] <- tstat(treatment, control)
+}
+```
+
+The values in `null` form what we call the null distribution. So what is the value which 97.5% of the 10,000 are smaller than and what is the value which 2.5% of the 10,000 are smaller than? These are the two endpoints of the rejection region. 
+
+```{r}
+end1 <- quantile(null, p=c(0.975))
+end2 <- quantile(null, p=c(0.025))
+print(end1)
+print(end2)
+```
+
+What percent of the 10,000 are bigger than `abs(obststat)` or smaller than `-abs(obststat)`? The p-value.
+
+```{r}
+pval <- mean(null > abs(obststat)) + mean(null < -abs(obststat))
+print(pval)
+```
+
+Do we reject the H0?
+
+```{r}
+abs(obststat)>end1 | -abs(obststat)<end2
+
+pval<0.05
+```
+
+## RMD_example 4.4: Normal approximation for the t-statistic
+
+In practice, we do not have access to the population. Thus, in practice, we use the normal approximation to obtain the two endpoints of the rejection region for $\alpha=0.05$:
+
+```{r}
+nend1 <- qnorm(1-0.025)
+nend2 <- -qnorm(1-0.025)
+print(nend1)
+print(nend2)
+```
+
+We are asked to report a p-value. What do we do? We learned that `obststat`, referred to as the observed effect size, is a random variable. As explained in the lecture notes, the CLT tells us that under the null hypothesis for large sample sizes, the t-statistic is approximately normal with mean 0 (the null hypothesis) and SD 1 (we divided by its SE).
+
+So now to calculate a p-value all we need to do is ask: how often does a N(0,1) (standard normal) random variable exceed `obststat`? R has a built-in function, `pnorm`, to answer this specific question. `pnorm(a)` returns the probability that a random variable following the standard normal distribution falls below `a`. To obtain the probability that it is larger than `a`, we simply use `1-pnorm(a)`. We want to know the probability of seeing something as extreme as `diff`: either smaller (more negative) than `-abs(obststat)` or larger than `abs(obststat)`. We call these two regions "tails" and calculate their size:
+
+```{r}
+righttail <- 1 - pnorm(abs(obststat))
+lefttail <- pnorm(-abs(obststat))
+npval <- lefttail + righttail
+print(npval)
+```
+
+Do we reject the H0?
+
+```{r}
+abs(obststat)>nend1 | -abs(obststat)<nend2
+
+npval<0.05
+```
+
+Now there is a problem. CLT works for large samples, but is 12 large enough? A rule of thumb for CLT is that 30 is a large enough sample size (but this is just a rule of thumb). The p-value we computed is only a valid approximation if the assumptions hold, which do not seem to be the case here. However, there is another option other than using CLT: using t-distributions.
+
+## RMD_example 4.5: t-distributions for t-statistics
+
+Statistical theory offers another useful result. If the distribution of the population is normal, then we can work out the exact distribution of the t-statistic without the need for the CLT. This is a big "if" given that, with small samples, it is hard to check if the population is normal. But for something like weight, we suspect that the population distribution is likely well approximated by normal and that we can use this approximation. Furthermore, we can look at a qq-plot for the samples. This shows that the approximation is at least close:
+
+```{r}
+library(rafalib)
+mypar(1,2)
+qqnorm(obs_control)
+qqline(obs_control,col=2)
+
+qqnorm(obs_treatment)
+qqline(obs_treatment,col=2)
+```
+
+If we use this approximation, then statistical theory tells us that the distribution of the random variable `tstat` follows a t-distribution with degree of freedom = $N-1$. Thus, the two endpoints of the rejection region for $\alpha=0.05$ are
+
+```{r}
+qt(1-0.025, df=(N-1))
+-qt(1-0.025, df=(N-1))
+```
+
+R has a nice function that actually computes everything for us.
+
+```{r}
+t.test(obs_treatment, obs_control)
+```
+
+To see just the p-value, we can use the `$` extractor:
+
+```{r}
+result <- t.test(obs_treatment, obs_control)
+result$p.value
+```
+
+The p-value is slightly bigger now.
+
+It may be confusing that one approximation gave us one p-value and another gave us another, because we expect there to be just one answer. However, this is not uncommon in data analysis. We used different assumptions, different approximations, and therefore we obtained different results.
+
+## RMD_example 4.6: Connection between CI and p-value
+
+The confidence interval for the difference $\mu_{Y}-\mu_{X}$ is provided by the `t.test` function:
+
+```{r}
+result$conf.int
+```
+
+In this case, the 95% confidence interval does include 0 and we observe that the p-value is 
+
+```{r}
+result$p.value
+```
+
+which is larger than 0.05 as predicted. If we change this to a 90% confidence interval, then:
+
+```{r}
+t.test(obs_treatment, obs_control, conf.level=0.9)$conf.int
+```
+
+0 is no longer in the confidence interval (which is expected because the p-value is smaller than 0.10).
+
+## RMD_example 4.7: Power calculations
+
+We have used the example of the effects of two different diets on the weight of mice. Since in this illustrative example we have access to the population, we know that in fact there is a substantial (about 10%) difference between the average weights of the two populations:
+
+```{r}
+library(dplyr)
+dat <- read.csv("mice_pheno.csv") # Previously downloaded
+controlPopulation <- filter(dat,Sex == "F" & Diet == "chow") %>% select(Bodyweight) %>% unlist
+hfPopulation <- filter(dat,Sex == "F" & Diet == "hf") %>% select(Bodyweight) %>% unlist
+mu_hf <- mean(hfPopulation)
+mu_control <- mean(controlPopulation)
+print(mu_hf - mu_control)
+print((mu_hf - mu_control)/mu_control * 100) # percent increase
+```
+
+We have also seen that, in some cases, when we take a sample and perform a t-test, we don’t always get a p-value smaller than 0.05. For example, here is a case were we take sample of 5 mice and don’t achieve statistical significance at the 0.05 level:
+
+```{r}
+set.seed(1)
+N <- 5
+hf <- sample(hfPopulation,N)
+control <- sample(controlPopulation,N)
+t.test(hf,control)$p.value
+```
+
+Did we make a mistake? By not rejecting the null hypothesis, are we saying the diet has no effect? The answer to this question is no. All we can say is that we did not reject the null hypothesis. But this does not necessarily imply that the null is true. The problem is that, in this particular instance, we don’t have enough _power_. If you are doing scientific research, it is very likely that you will have to do a power calculation at some point. In many cases, it is an ethical obligation as it can help you avoid sacrificing mice unnecessarily or limiting the number of human subjects exposed to potential risk in a study. 
+
+Here we will illustrate the concepts behind power by coding up
+simulations in R. Suppose our sample size is:
+
+```{r}
+N <- 12
+```
+
+and we will reject the null hypothesis at:
+
+```{r}
+alpha <- 0.05
+```
+
+What is our power with this particular data? We will compute this probability by re-running the exercise many times and calculating the proportion of times the null hypothesis is rejected. Specifically, we will run:
+
+```{r}
+B <- 2000
+```
+
+simulations. The simulation is as follows: we take a sample of size `N` from both control and treatment groups, we perform a t-test comparing these two, and report if the p-value is less than `alpha` or not. We write a function that does this:
+
+```{r}
+reject <- function(N, alpha=0.05){
+  hf <- sample(hfPopulation,N)
+  control <- sample(controlPopulation,N)
+  pval <- t.test(hf,control)$p.value
+  pval < alpha
+}
+```
+
+Here is an example of one simulation for a sample size of 12. The call to reject answers the question "Did we reject?"
+
+```{r}
+reject(12)
+```
+
+Now we can use the replicate function to do this `B` times.
+
+```{r}
+rejections <- replicate(B,reject(N))
+```
+
+Our power is just the proportion of times we correctly reject. So with `N = 12` our power is only:
+
+```{r}
+mean(rejections)
+```
+
+This explains why the t-test was not rejecting when we knew the null was false. With a sample size of just 12, our power is about 23%. To guard against false positives at the 0.05 level, we had set the threshold at a high enough level that resulted in many type II errors.
+
+Let’s see how power improves with `N`. We will use the function `sapply`, which applies a function to each of the elements of a vector. We want to repeat the above for the following sample size:
+
+```{r}
+Ns <- seq(5, 50, 5)
+```
+
+So we use `sapply` like this:
+
+```{r}
+power <- sapply(Ns,function(N){
+  rejections <- replicate(B, reject(N))
+  mean(rejections)
+})
+```
+
+For each of the simulations, the above code returns the proportion of times we reject. Not surprisingly power increases with `N`:
+
+```{r}
+plot(Ns, power, type="b")
+```
+
+Similarly, if we change the level alpha at which we reject, power changes. The smaller I want the chance of type I error to be, the less power I will have. Another way of saying this is that we trade off between the two types of error. We can see this by writing similar code, but keeping `N` fixed and considering several values of `alpha`:
+
+```{r}
+N <- 30
+alphas <- c(0.1,0.05,0.01,0.001,0.0001)
+power <- sapply(alphas,function(alpha){
+  rejections <- replicate(B,reject(N,alpha=alpha))
+  mean(rejections)
+})
+plot(alphas, power, xlab="alpha", type="b", log="x")
+```
+
+Note that the x-axis in this last plot is in the log scale.
+
+There is no "right" power or "right" alpha level, but it is important that you understand what each means.
+

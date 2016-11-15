@@ -1,0 +1,425 @@
+---
+title: 'Lecture 2: Random variables, distributions, and Central Limit Theorem'
+output: html_document
+date: "2016/9/21"
+---
+
+# Random variable
+
+## RMD_example 2.1: Examining femaleMiceWeights.csv
+
+```{r}
+dat <- read.csv("femaleMiceWeights.csv") # put the file in your working directory first
+
+# take a look at data
+dat 
+```
+
+So are the hf mice heavier? Mouse 24 at 20.73 grams is one the lightest mice, while Mouse 21 at 34.02 grams is one of the heaviest. Both are on the hf diet. Just from looking at the data, we see there is variability. Claims such as the one above usually refer to the averages. So let?€™s look at the average of each group:
+
+```{r}
+library(dplyr)
+obs_control <- filter(dat, Diet=="chow") %>% select(Bodyweight) %>% unlist
+obs_treatment <- filter(dat, Diet=="hf") %>% select(Bodyweight) %>% unlist
+obsmu_control <- mean(obs_control)
+obsmu_treatment <- mean(obs_treatment)
+print(obsmu_control)
+print(obsmu_treatment)
+obsdiff <- obsmu_treatment - obsmu_control 
+print(obsdiff)
+```
+
+## RMD_example 2.2: Sample repeatedly from the population
+
+Imagine that we actually have the weights of all control female mice in the data femaleControlsPopulation.csv
+
+```{r}
+population <- read.csv("femaleControlsPopulation.csv") # put the file in your working directory first
+
+# take a look at data
+head(population)
+
+# turn it into a numeric
+population <- unlist(population) 
+```
+
+Now let?€™s sample 12 mice three times and see how the average changes.
+
+```{r}
+control <- sample(population, 12)
+mean(control)
+
+control <- sample(population, 12)
+mean(control)
+
+control <- sample(population, 12)
+mean(control)
+```
+
+Note how the average varies. We can continue to do this repeatedly.
+
+# Distributions
+
+## RMD_example 2.3: The weights of female mice in the control population
+
+For example, suppose you have measured the weights of all female mice in the control population. Imagine you need to describe these numbers to someone that has no idea what these weights are. All these weights are contained in the following dataset:
+
+```{r}
+x <- read.csv("femaleControlsPopulation.csv") # put the file in your working directory first
+
+# turn it into a numeric
+x <- unlist(x) 
+
+```
+
+One approach to summarizing these numbers is to simply list them all out for the people to see. Here are 10 randomly selected weights:
+
+```{r}
+round(sample(x,10),1)
+```
+
+## RMD_example 2.4: Plot empirical CDF
+
+```{r}
+smallest <- floor( min(x) )
+largest <- ceiling( max(x) )
+values <- seq(smallest, largest, len=300)
+weightecdf <- ecdf(x) # a *function*
+plot(values, weightecdf(values), type="l", xlab="a (Weight in grams)",ylab="Pr(x <= a)")
+```
+
+## RMD_example 2.5: A histogram of weights
+
+```{r}
+hist(x)
+```
+
+We can specify the bins and add better labels in the following way:
+
+```{r}
+bins <- seq(smallest, largest)
+hist(x,breaks=bins,xlab="Weight (in grams)",main="Female mice weights")
+```
+
+## RMD_example 2.6: The probability distribution of the mean of mouse weights
+
+First, we run the Monte Carlo simulation to obtain 10,000 means of mouse weights from the control population. These means are saved in the vector `vecmu`.
+
+```{r}
+n <- 10000
+vecmu <- vector("numeric", n)
+for (i in 1:n) 
+{
+    control <- sample(population,12)
+    vecmu[i] <- mean(control)
+}
+```
+
+The values in `vecmu` form the distribution of the mean of mouse weights from the control population. 
+We can then draw a histogram of the vector. 
+
+```{r}
+hist(vecmu, freq=TRUE)
+abline(v=26, col="red", lwd=2)
+```
+
+We can see what percent of the 10,000 means are bigger than 26 grams.
+
+```{r}
+mean(vecmu >= 26)
+```
+
+Running codes below, you can see the distribution forming as the observed values stack on top of each other. The figure below amounts to a stem-and-leave plot (similar to histogram). 
+
+```{r}
+n <- 100
+library(rafalib)
+nullplot(21,27,1,40, xlab="Observed means (grams)", ylab="Frequency")
+totals <- vector("numeric",7)
+for (i in 1:n) 
+{
+    control <- sample(population,12) 
+    mu_control <- mean(control)
+    # add a point to the figure every time we re-run the experiment
+    j <- pmax(pmin(round(mu_control)-20,11),1)
+    totals[j] <- totals[j]+1
+    text(j+20,totals[j],pch=15,round(mu_control,2))
+    # if(i < 15) Sys.sleep(1) # You can add this line to see values appear slowly
+} 
+```
+
+## RMD_example 2.7: Normal approximation
+
+We can compute the proportion of values below a value x with pnorm(x,mu,sigma) without knowing all the values. The normal approximation works very well here:
+
+```{r}
+1 - pnorm(26, mean(vecmu), sd(vecmu))
+```
+
+## RMD_example 2.8: The mouse weight population 
+
+We happen to have the weights of all the mice of this type. Here we download and read in this dataset:
+
+```{r}
+url <- "http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/mice_pheno.csv"
+filename <- "mice_pheno.csv"
+download.file(url, destfile=filename)
+dat <- read.csv(filename)
+head(dat)
+```
+
+We can access the population values and determine, for example, how many we have. Here we compute the size of the control population. Start by selecting only female mice since males and females have different weights.
+
+```{r}
+library(dplyr)
+controlPopulation <- filter(dat, Sex =="F" & Diet =="chow") %>% select(Bodyweight) %>% unlist
+length(controlPopulation)
+```
+
+We can do the same for the high fat diet population:
+
+```{r}
+hfPopulation <- filter(dat,Sex == "F" & Diet == "hf") %>% select(Bodyweight) %>% unlist
+length(hfPopulation)
+```
+
+## RMD_example 2.9: Central limit theorem in practice 
+
+Let?€™s use our data to see how well the central limit theorem approximates sample averages from our data. We will leverage our entire population dataset to compare the results we obtain by actually sampling from the distribution to what the CLT predicts.
+
+```{r}
+#file was previously downloaded
+dat <- read.csv("mice_pheno.csv") 
+head(dat)
+```
+
+Start by selecting only female mice since males and females have different weights. 
+
+```{r}
+library(dplyr)
+controlPopulation <- filter(dat,Sex == "F" & Diet == "chow") %>% select(Bodyweight) %>% unlist
+hfPopulation <- filter(dat,Sex == "F" & Diet == "hf") %>% select(Bodyweight) %>% unlist
+```
+
+We can compute the population parameters of interest using the `mean` function.
+
+```{r}
+mu_control <- mean(controlPopulation)
+mu_hf <- mean(hfPopulation)
+print(mu_control)
+print(mu_hf) 
+```
+
+Compute the population standard drviations as well. Notice that the R fuction `sd` would compute the variance that divide by the sample size - 1. However, we use the `popsd` function in `rafalib`, which divide by the sample size:
+
+
+```{r}
+library(rafalib)
+sd_control <- popsd(controlPopulation)
+sd_hf <- popsd(hfPopulation)
+
+sd_control/sd(controlPopulation)
+sd_hf/sd(hfPopulation)
+```
+
+Remember that in practice we do not get to compute these population parameters. These are values we never see. In general, we want to estimate them from samples.
+
+```{r}
+N <- 12
+control <- sample(controlPopulation, N)
+hf <- sample(hfPopulation, N)
+```
+
+For large $N$, we have the CLT for the sample average. A rule of thumb is that $N$ should be 30 or more for the CLT. However, that is just a rule of thumb since
+the preciseness of the approximation depends on the population distribution. Here we can actually check the approximation and we do that for various values of $N$.
+
+Now we use sapply and replicate instead of for loops, which makes for cleaner code:
+
+```{r}
+Ns <- c(3,12,25,50)
+B <- 10000 # number of simulations
+
+res_control <- sapply(Ns,function(n) {
+  replicate(B, mean(sample(controlPopulation,n)))
+})
+
+res_hf <- sapply(Ns,function(n) {
+  replicate(B,mean(sample(hfPopulation,n)))
+})
+```
+
+Now we can use qq-plots to see how well CLT approximations works for these. If in fact the normal distribution is a good approximation, the points should fall on a straight line when compared to normal quantiles. 
+The more it deviates, the worse the approximation. In the title, we also show the average and SD of the observed distribution, which demonstrates how the SD decreases with $\sqrt{N}$ as predicted.
+
+```{r}
+mypar(2,2)
+for (i in seq(along=Ns)) {
+  titleavg <- signif(mean(res_control[,i]),3)
+  titlesd <- signif(popsd(res_control[,i]),3)
+  title <- paste0("For conrol mean, N=",Ns[i]," Avg=",titleavg," SD=",titlesd)
+  qqnorm(res_control[,i],main=title)
+  qqline(res_control[,i],col=2)
+}
+
+mypar(2,2)
+for (i in seq(along=Ns)) {
+  titleavg <- signif(mean(res_hf[,i]),3)
+  titlesd <- signif(popsd(res_hf[,i]),3)
+  title <- paste0("For hf mean, N=",Ns[i]," Avg=",titleavg," SD=",titlesd)
+  qqnorm(res_hf[,i],main=title)
+  qqline(res_hf[,i],col=2)
+}
+```
+
+Here we see a pretty good fit even for 3. Why is this? Because the population itself is relatively close to normally distributed, the averages are close to normal as well (the sum of normals is also a normal). 
+
+```{r}
+mypar(1,2)
+qqnorm(controlPopulation, main="For control population qq-plot")
+qqline(controlPopulation)
+qqnorm(hfPopulation, main="For hf population qq-plot")
+qqline(hfPopulation)
+```
+
+In practice, we actually calculate a t-ratio: we divide by the estimated standard deviation. Here is where the sample size starts to matter more.
+
+```{r}
+Ns <- c(3,12,25,50)
+B <- 10000 # number of simulations
+
+# function to compute the t-ratio
+computetratio <- function(n, invec) {
+  x <- sample(invec, n)  
+  (mean(x)-mean(invec))/sqrt(var(x)/n)
+}
+
+res_control <- sapply(Ns,function(n) {
+  replicate(B,computetratio(n, controlPopulation))
+})
+
+res_hf <- sapply(Ns,function(n) {
+  replicate(B,computetratio(n, hfPopulation))
+})
+
+mypar(2,2)
+for (i in seq(along=Ns)) {
+  title <- paste0("For control t-ratio, N=",Ns[i])
+  qqnorm(res_control[,i],main=title)
+  qqline(res_control[,i],col=2)
+}
+
+mypar(2,2)
+for (i in seq(along=Ns)) {
+  title <- paste0("For hf t-ratio, N=",Ns[i])
+  qqnorm(res_hf[,i],main=title)
+  qqline(res_hf[,i],col=2)
+}
+```
+
+So we see that when $N$ becomes larger, the CLT provides a more usable approximation. 
+
+As mentioned above, we will not be able to perform this simulation in most situations. We only use the simulation to illustrate the concepts behind the CLT and its limitations. 
+
+## RMD_example 2.10: Null distribution of t-statistics
+
+We begin by loading experimental data and then calculate the observed t-statistic.
+
+```{r}
+library(dplyr)
+dat <- read.csv("femaleMiceWeights.csv") # previously downloaded
+obs_control <- filter(dat,Diet=="chow") %>% select(Bodyweight) %>% unlist
+obs_treatment <- filter(dat,Diet=="hf") %>% select(Bodyweight) %>% unlist
+
+# a function for calculating the t-statistic
+tstat <- function(x, y) {
+  diff <- mean(x) - mean(y)
+  diffse <- sqrt(var(x)/length(x) + var(y)/length(y))
+  t <- diff/diffse
+  t
+}
+
+obststat <- tstat(obs_treatment, obs_control)
+print(obststat)
+```
+
+We have access to the control population `controlPopulation`.
+Let's randomly sample 24 control mice, giving them the same diet, and then record the t-statistic between two randomly split groups of 12 and 12. 
+
+```{r}
+# 12 control mice
+control <- sample(controlPopulation, 12)
+# another 12 control mice that we act as if they were not
+treatment <- sample(controlPopulation, 12)
+
+tstat(treatment, control)
+```
+
+Let'sî¨? do it 10,000 times using a "for-loop"
+
+```{r}
+n <- 10000
+null <- vector("numeric", n)
+for (i in 1:n) 
+{
+    control <- sample(controlPopulation,12)
+    treatment <- sample(controlPopulation,12)
+    null[i] <- tstat(treatment, control)
+}
+```
+
+The values in null form what we call the null distribution. So what percent of the 10,000 are bigger than obststat? The p-value?
+
+```{r}
+mean(null >= obststat)
+```
+
+## RMD_example 2.11:  t-tests in practice
+
+We will now demonstrate how to obtain a p-value in practice in t-tests. 
+
+We are asked to report a p-value. What do we do? We learned that `obststat`, referred to as the observed effect size, is a random variable. As explained in the lecture notes, the CLT tells us that under the null hypothesis for large sample sizes, the t-statistic is approximately normal with mean 0 (the null hypothesis) and SD 1 (we divided by its SE).
+
+So now to calculate a p-value all we need to do is ask: how often does a N(0,1) (standard normal) random variable exceed `obststat`? R has a built-in function, `pnorm`, to answer this specific question. `pnorm(a)` returns the probability that a random variable following the standard normal distribution falls below `a`. To obtain the probability that it is larger than `a`, we simply use `1-pnorm(a)`. We want to know the probability of seeing something as extreme as `diff`: either smaller (more negative) than `-abs(obststat)` or larger than `abs(obststat)`. We call these two regions ?€œtails?€? and calculate their size:
+
+```{r}
+righttail <- 1 - pnorm(abs(obststat))
+lefttail <- pnorm(-abs(obststat))
+pval <- lefttail + righttail
+print(pval)
+```
+
+In this case, the p-value is smaller than 0.05 and using the conventional cutoff of 0.05, we would call the difference _statistically significant_.
+
+Now there is a problem. CLT works for large samples, but is 12 large enough? A rule of thumb for CLT is that 30 is a large enough sample size (but this is just a rule of thumb). The p-value we computed is only a valid approximation if the assumptions hold, which do not seem to be the case here. However, there is another option other than using CLT: using t-distributions.
+
+## RMD_example 2.12: t-distributions in practice
+
+Statistical theory offers another useful result. If the distribution of the
+population is normal, then we can work out the exact distribution of the t-statistic without the need for the CLT. This is a big ?€œif?€? given that, with small samples, it is hard to check if the population is normal. But for something like weight, we suspect that the population distribution is likely well approximated by normal and that we can use this approximation. Furthermore, we can look at a qq-plot for the samples. This shows that the approximation is at least close:
+
+```{r}
+library(rafalib)
+mypar(1,2)
+qqnorm(obs_control)
+qqline(obs_control,col=2)
+
+qqnorm(obs_treatment)
+qqline(obs_treatment,col=2)
+```
+
+If we use this approximation, then statistical theory tells us that the distribution of the random variable `tstat` follows a t-distribution. R has a nice function that actually computes everything for us.
+
+```{r}
+t.test(obs_treatment, obs_control)
+```
+
+To see just the p-value, we can use the `$` extractor:
+
+```{r}
+result <- t.test(obs_treatment, obs_control)
+result$p.value
+```
+
+The p-value is slightly bigger now.
+
+It may be confusing that one approximation gave us one p-value and another gave us another, because we expect there to be just one answer. However, this is not uncommon in data analysis. We used different assumptions, different approximations, and therefore we obtained different results.

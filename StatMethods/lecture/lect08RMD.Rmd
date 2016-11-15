@@ -1,0 +1,191 @@
+---
+title: 'Lecture 8: Statistical decision making: hypothesis testing'
+output: html_document
+date: "2016/11/2"
+---
+
+# Hypothesis testing for continuous random variables
+
+## RMD_example 8.1: Read the Gene expression microarray data (samplexprs.csv) 
+
+```{r}
+# Get the file url
+fileurl <- "http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/samplexprs.csv"
+
+# Import the csv file into R
+#   note: stringsAsFactors=TRUE will screw up conversion to numeric!
+samplexprs <- read.csv(fileurl, header=TRUE, stringsAsFactors=FALSE)
+
+dim(samplexprs)
+head(samplexprs[,1:10])
+```
+
+## RMD_example 8.2: One-sample t-test
+
+```{r}
+# Summary statistics for exprs of gene J00129
+#   Install package "psych" first, then load it into R
+library(psych)
+J00129<-samplexprs[,'J00129']
+describe(J00129)
+
+# One-sample t-test
+t.test(J00129, mu=-0.5) # Ho: mu=-0.5
+```
+
+## RMD_example 8.3: Two-sample t-test
+
+```{r}
+# summary statistics of J00129 by metastases
+metastases<-samplexprs[,'metastases']
+describeBy(J00129, metastases)
+
+# two-sample t-test for J00129 over metastases
+t.test(J00129~metastases, var.equal=T, na.action='na.omit')
+t.test(J00129~metastases, var.equal=F, na.action='na.omit')
+var.test(J00129~metastases, na.action='na.omit')
+```
+
+## RMD_example 8.4: ANOVA
+
+```{r}
+# summary statistics of J00129 by ERp
+ERp<-samplexprs[,'ERp']
+describeBy(J00129, ERp)
+
+# more than two samples test for J00129 over ERp
+anova(lm(J00129~as.factor(ERp)))
+```
+
+## RMD_example 8.5: Paired t-test
+
+```{r}
+# summary statistics for exprs of gene Contig29982_RC
+Contig29982_RC<-samplexprs[,'Contig29982_RC']
+describe(Contig29982_RC)
+
+# paired t-test for comparing J00129 vs Contig29982_RC
+t.test(J00129, Contig29982_RC, paired=T, na.action='na.omit')
+```
+# Measures of association and hypothesis testing for categorical data
+
+## RMD_example 8.6: Binomial test
+
+```{r}
+# generating frequency tables
+#   install package "gmodels", "epiR" first, then load them into R
+library(gmodels)
+library(epiR)
+
+#   create ERs=1 if ERp>10, 0 o.w.
+ERs<-rep(0, length(ERp))
+ERs[!is.na(ERp) & ERp>10]<-1
+ERs[is.na(ERp)]<-NA
+
+# test for a single proportion
+TAB<-xtabs(~ERs)
+TAB
+#   notice: p=Pr(ERs=0)
+chisq.test(TAB) # Ho: p=0.5
+chisq.test(TAB, p=c(0.4, 0.6)) # Ho: p=0.4
+binom.test(TAB, p=0.5) # Ho: p=0.5
+binom.test(TAB, p=0.4) # Ho: p=0.4
+```
+
+## RMD_example 8.7: Cohort and case-control studies
+
+For exploring the data, we first create the $2 \times 2$ table.
+
+```{r}
+TAB1<-xtabs(~ERs+metastases)
+TAB1
+```
+
+If the data are from a chort study, we can have relative risk and odds ratio. In the function `epi.2by2`, notice that "Exposed +" is for "ERs=0" and "Exposed -" is for "ERs=1", and "Outcome +" is for "metastases=0" and "Outcome -" is for "metastases=1"
+
+```{r}
+epi.2by2(TAB1, method='cohort.count')
+```
+
+If the data are from a case-control study, we can have the odds ratio.
+
+```{r}
+epi.2by2(TAB1, method='case.control')
+```
+
+## RMD_example 8.8: Chi2 / Fisher's exact test
+
+```{r}
+# chi2 / Fisher's exact test
+CrossTable(ERs, metastases, prop.chisq=F, chisq=T, fisher=T)
+```
+
+## RMD_example 8.9: McNemar's test for matched-pair studies
+
+```{r}
+# good prognosis (1 to 34) matches poor prognosis (1 to 34)
+Pg<-ERs[metastases==1][1:34]
+Gg<-ERs[metastases==0][1:34]
+TAB2<-xtabs(~Pg+Gg)
+TAB2
+
+# McNemar's test for ERs on prognosis
+mcnemar.test(TAB2)
+```
+
+## RMD_example 8.10: Measure of agreement and its test
+
+```{r}
+# measure of agreement
+#    on expression of J00129 and Contig29982_RC
+Jexpry<-rep(0, length(J00129))
+Jexpry[!is.na(J00129) & (J00129 > -0.5)]<-1
+Jexpry[is.na(J00129)]<-NA
+Cexpry<-rep(0, length(Contig29982_RC))
+Cexpry[!is.na(Contig29982_RC) & (Contig29982_RC > -0.5)]<-1
+Cexpry[is.na(Contig29982_RC)]<-NA
+TAB3<-xtabs(~Jexpry+Cexpry)
+TAB3
+
+# kappa coefficient/test
+#   install the package "fmsb" first, then load it into R
+library(fmsb)
+Kappa.test(TAB3)
+```
+
+## RMD_example 8.11: Mantel-Haenszel test
+
+```{r}
+# create age40=1 if age>40, 0 o.w.
+age<-samplexprs[,'age']
+age40<-rep(0, length(age))
+age40[!is.na(age) & age>40]<-1
+age40[is.na(age)]<-NA
+
+TAB4<-xtabs(~ERs+metastases+age40)
+TAB4
+epi.2by2(TAB4, method='cohort.count')
+mantelhaen.test(TAB4)
+```
+
+# Nonparametric statistical methods
+
+## RMD_example 8.12: Nonparametric tests
+
+```{r}
+# sign test
+#   install the package "BSDA" first, then load it into R
+library(BSDA)
+SIGN.test(J00129, md=-0.5) # Ho: mu=-0.5
+
+# Wilcoxon signed-rank test
+#   install the package "MASS" first, then load it into R
+library(MASS)
+wilcox.test(J00129, Contig29982_RC, paired=T)
+
+# Wilcoxon rank-sum (Mann-Whitney) test
+wilcox.test(J00129~metastases)
+
+# Kruskal-Wallis test
+kruskal.test(J00129~as.factor(ERp))
+```

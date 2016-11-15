@@ -1,0 +1,88 @@
+---
+title: 'Lecture 1: Getting Started'
+output: html_document
+date: "2016/9/14"
+---
+
+# Getting started with R
+
+## RMD_example 1.1: Installing R packages
+
+```{r, eval=FALSE}
+# install package from within R
+install.packages("swirl")
+
+# load the package into our R sessions for use
+library(swirl)
+
+# run the function
+swirl()
+```
+
+## RMD_example 1.2: Download file with your browser to your working directory
+
+```{r}
+# save the femaleMiceWeights.csv file in your working directory
+
+# read it into R
+dat <- read.csv("femaleMiceWeights.csv")
+```
+
+## RMD_example 1.3: Download from within R
+
+```{r}
+# save the file directly from the internet to your computer
+fileurl <- "http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/femaleMiceWeights.csv"
+filename <- "femaleMiceWeights.csv"
+download.file(fileurl, destfile=filename)
+
+# then read it in like this:
+dat <- read.csv(filename)
+```
+
+## RMD_example 1.4: Read the file directly 
+
+```{r}
+fileurl <- "http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/femaleMiceWeights.csv"
+dat <- read.csv(fileurl)
+```
+
+# R package dplyr
+
+## RMD_example 1.5: Example
+
+```{r}
+# take a look at the dataset
+filename <- "femaleMiceWeights.csv" 
+dat <- read.csv(filename)
+dat # in R Studio use View(dat)
+
+# subset and filter
+library(dplyr) # install the pakage first if you had not yet done it
+chow <- filter(dat, Diet=="chow") # keep only the ones with chow diet
+chow
+
+# select only the column with the values
+chowVals <- select(chow, Bodyweight)
+chowVals
+
+# perform consecutive tasks using %>%
+chowVals <- filter(dat, Diet=="chow") %>% select(Bodyweight)
+
+# know data type
+class(dat)
+class(chowVals)
+
+# turn lists into numeric vectors
+unlist(chowVals)
+
+# perform consecutive tasks using %>%
+chowVals <- filter(dat, Diet=="chow") %>% select(Bodyweight) %>% unlist
+class(chowVals)
+
+# to do thess in R without dplyr, the code is the following:
+chowVals <- dat[dat$Diet=="chow", colnames(dat)=="Bodyweight"]
+head(chowVals)
+class(chowVals)
+```
+
