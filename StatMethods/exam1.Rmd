@@ -1,0 +1,102 @@
+---
+title: "exam1"
+author: "0556078"
+date: "November 16, 2016"
+output: html_document
+---
+
+```{r}
+library(rafalib)
+```
+
+```{r}
+url <- "http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/maleMiceWeights.csv"
+filename <- basename(url)
+download.file(url, destfile=filename)
+x <- read.csv(filename)
+```
+
+#### 1. Ans: 1.9957
+```{r}
+x_norm <- x$Bodyweight[x$Diet == "chow"]
+x_hf <- x$Bodyweight[x$Diet == "hf"]
+
+ratio <- var(x_norm)/var(x_hf)
+round(ratio, 4)
+```
+
+```{r}
+url <- "http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/malemice_pheno.csv"
+filename <- basename(url)
+download.file(url, destfile=filename)
+x_pop <- read.csv(filename)
+xpop_norm <- x_pop$Bodyweight[x_pop$Diet == "chow"]
+xpop_hf <- x_pop$Bodyweight[x_pop$Diet == "hf"]
+```
+
+#### 2. Ans: no
+```{r}
+N <- 1000
+n <- 12
+samvar = vector("numeric", N)
+set.seed(1)
+for(i in c(1:N)){
+  samvar[i] <- var(sample(xpop_norm, n))
+}
+```
+
+```{r}
+mypar(1,2)
+hist(samvar)
+qqnorm(samvar)
+qqline(samvar,col=2)
+```
+
+#### 3. Ans: 0.937 is approximate to 0.95
+```{r}
+xpop_norm_var <- var(xpop_norm)
+qchi2.0025 <- qchisq(0.025, df = 11)
+qchi2.0975 <- qchisq(0.975, df = 11)
+
+mean((n-1)*samvar/qchi2.0025 >= xpop_norm_var & (n-1)*samvar/qchi2.0975 <= xpop_norm_var)
+```
+
+#### 4. Ans: p-value = 0.958
+```{r}
+myF <- var(x_norm)/var(x_hf)
+samF <- vector("numeric", N)
+set.seed(1)
+for(i in c(1:N)){
+  samF[i] <- var(sample(xpop_norm, n))/var(sample(xpop_hf, n))
+}
+```
+
+```{r}
+hist(samF)
+abline(v=myF, col="red", lwd=2)
+round(mean(samF < myF), 4)
+```
+
+#### 5. Ans: p-value = 0.8664
+```{r}
+round(pf(myF, n-1, n-1), 4)
+```
+
+#### 6. Ans: p-value = 0.9141
+```{r}
+fpermu <- replicate(1000, {
+  all <- sample(c(x_norm,x_hf))
+  new_x_norm <- all[1:n]
+  new_x_hf <- all[(n+1):(2*n)]
+  return(var(new_x_norm)/var(new_x_hf))
+})
+```
+
+```{r}
+round((sum(fpermu < myF) + 1) / (length(fpermu) + 1), 4)
+```
+
+#### 7. Ans: p-value = 0.8664
+```{r}
+var.test(x_norm, x_hf, alternative = "less", na.action='na.omit')
+```

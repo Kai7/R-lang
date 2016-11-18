@@ -12,6 +12,7 @@ date: "2016/9/14"
 # install package from within R
 install.packages("swirl")
 
+
 # load the package into our R sessions for use
 library(swirl)
 
