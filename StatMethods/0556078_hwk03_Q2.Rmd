@@ -1,0 +1,79 @@
+---
+title: "0556078_hw3_Q2"
+author: "0556078"
+date: "November 18, 2016"
+output: html_document
+---
+
+```{r}
+library(rafalib)
+library(dplyr)
+```
+
+## Question 2:
+```{r}
+url <- "https://raw.githubusercontent.com/genomicsclass/dagdata/master/inst/extdata/babies.txt"
+filename <- basename(url)
+#download.file(url, destfile = filename)
+babies <- read.table("babies.txt", header = TRUE)
+bwt.nonsmoke <- filter(babies, smoke == 0) %>% select(bwt) %>% unlist
+bwt.smoke <- filter(babies, smoke == 1) %>% select(bwt) %>% unlist
+```
+
+```{r}
+N <- 10
+set.seed(1)
+nonsmokers <- sample(bwt.nonsmoke , N)
+smokers <- sample(bwt.smoke , N)
+obs <- mean(smokers) - mean(nonsmokers)
+```
+
+```{r}
+dat <- c(smokers,nonsmokers)
+shuffle <- sample( dat )
+smokersstar <- shuffle[1:N]
+nonsmokersstar <- shuffle[(N+1):(2*N)]
+mean(smokersstar) - mean(nonsmokersstar)
+```
+
+### 1. Ans: p-value = 0.052
+#### Hypotheses.
+We are interested in testing the following hypotheses:
+$$ H_{0}:\mu_{x} = \mu_{y} \\
+   H_{1}:\mu_{x} \neq \mu_{y} $$
+where $\mu_{x}$ and $\mu_{y}$ are the population mean of smoking and non-smoking groups, respectively.
+
+```{r}
+gen_diff_mean_permut <- function(){
+  shuffle <- sample(dat)
+  smokersstar <- shuffle[1:N]
+  nonsmokersstar <- shuffle[(N+1):(2*N)]
+  return(mean(smokersstar) - mean(nonsmokersstar))
+}
+set.seed(1)
+X_permut <- replicate(1000, gen_diff_mean_permut())
+```
+
+```{r}
+p_val <- mean(abs(X_permut) > abs(obs))
+round(p_val, 4)
+```
+
+### 2. Ans: p-value = 0.017
+```{r}
+obs <- median(smokers) - median(nonsmokers)
+
+gen_diff_median_permut <- function(){
+  shuffle <- sample(dat)
+  smokersstar <- shuffle[1:N]
+  nonsmokersstar <- shuffle[(N+1):(2*N)]
+  return(median(smokersstar) - median(nonsmokersstar))
+}
+set.seed(1)
+X_permut <- replicate(1000, gen_diff_median_permut())
+```
+
+```{r}
+p_val <- mean(abs(X_permut) > abs(obs))
+round(p_val, 4)
+```

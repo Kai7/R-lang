@@ -1,0 +1,246 @@
+---
+title: "0556078_hwk03"
+author: "0556078"
+date: "November 18, 2016"
+output: html_document
+---
+
+```{r}
+library(rafalib)
+library(dplyr)
+```
+
+## Question 1:
+### 1-1.
+**Ans: t = 0.3008**
+```{r}
+set.seed(1)
+X <- rnorm(5)
+tstat <- mean(X)*sqrt(5)/sd(X)
+round(tstat, 4)
+```
+
+### 1-2.
+**Ans: 0.068**
+```{r}
+t_sampling <- function(n){
+  X <- rnorm(n)
+  tstat <- mean(X)*sqrt(n)/sd(X)
+  return(tstat)
+}
+B <- 1000
+set.seed(1)
+t_sample <- replicate(B, t_sampling(5))
+```
+```{r}
+round(mean(t_sample > 2), 4)
+```
+
+### 1-3.
+**Ans: C) The approximations are spot on for all sample sizes.**
+```{r}
+smp_size = c(5, 10, 20, 30)
+mypar(2,2)
+for(s in smp_size){
+  set.seed(1)
+  t_sample <- replicate(B, t_sampling(s))
+  #ps <- (seq(0,B-1)+0.5)/B
+  ps <- seq(1/(B+1), 1-1/(B+1),len=B)
+  qqplot(qt(ps, df = s-1), t_sample, main=paste("degrees of freedom = ", s-1), 
+         xlab = "Theoretical Quantiles", ylab = "Sample Quantiles")
+  abline(0, 1, col = 2)
+}
+```
+
+### 1-4.
+**Ans: C) The approximations are spot on for all sample sizes.**
+```{r}
+t2_sampling <- function(n){
+  X1 <- rnorm(n)
+  X2 <- rnorm(n)
+  tstat <- (mean(X1) - mean(X2))*sqrt(n)/sqrt(var(X1)+var(X2))
+  return(tstat)
+}
+mypar(2,2)
+for(s in smp_size){
+  set.seed(1)
+  t_sample <- replicate(B, t2_sampling(s))
+  #ps <- (seq(0,B-1)+0.5)/B
+  ps <- seq(1/(B+1), 1-1/(B+1),len=B)
+  qqplot(qt(ps, df = 2*s-2), t_sample, main=paste("degrees of freedom = ", 2*s-2), 
+         xlab = "Theoretical Quantiles", ylab = "Sample Quantiles")
+  abline(0, 1, col = 2)
+}
+```
+
+### 1-5.
+**Ans: No.**
+```{r}
+mypar(1,1)
+gen_tstat_binom <- function(n){
+  X <- rbinom(n, size = 1, prob = 0.5)
+  tstat <- sqrt(n)*mean(X)/sd(X)
+  return(tstat)
+}
+set.seed(1)
+t_sample <- replicate(B, gen_tstat_binom(15))
+ps <- (seq(0,B-1)+0.5)/B
+qqplot(qt(ps, df = 15-1), t_sample, main=paste("degrees of freedom = ", 15-1), 
+         xlab = "Theoretical Quantiles", ylab = "Sample Quantiles")
+qqline(t_sample, col = 2)
+```
+
+### 1-6.
+**Ans: Yes.**
+```{r}
+set.seed(1)
+t_sample <- replicate(B, gen_tstat_binom(500))
+ps <- (seq(0,B-1)+0.5)/B
+qqplot(qt(ps, df = 500-1), t_sample, main=paste("degrees of freedom = ", 500-1), 
+         xlab = "Theoretical Quantiles", ylab = "Sample Quantiles")
+qqline(t_sample, col = 2)
+```
+
+### 1-7.
+**Ans: D) The sample median is approximately normal with mean 0 and SD larger than $1/\sqrt{N}$**  
+Because the distribution of sample median is approximate standard normal distribution by observation on the following experiment.
+```{r}
+gen_median <- function(n){
+  X <- rnorm(n)
+  return(median(X))
+}
+set.seed(1)
+m_smp_small <- replicate(B, gen_median(10))
+m_smp_large <- replicate(B, gen_median(100))
+```
+
+**check: If Sample Median ~ Norm(0,1/sqrt(N))**
+```{r}
+mypar(1,2)
+qqplot(qnorm(ps, mean = 0, sd = 1/sqrt(10)), m_smp_small, main=paste("Small Sample"),  
+       xlab = "Norm Quantiles", ylab = "Small Sample Quantiles")
+abline(0, 1, col = 2)
+qqplot(qnorm(ps, mean = 0, sd = 1/sqrt(100)), m_smp_large, main=paste("Large Sample"),  
+       xlab = "Norm Quantiles", ylab = "Large Sample Quantiles")
+abline(0, 1, col = 2)
+```
+
+**check: If Sample Median ~ Norm(0,1)**
+```{r}
+mypar(1,2)
+qqnorm(m_smp_small, main=paste("Small Sample"),  
+       xlab = "Standard Norm Quantiles", ylab = "Small Sample Quantiles")
+qqline(m_smp_small, col = 2)
+qqnorm(m_smp_large, main=paste("Large Sample"),  
+       xlab = "Standard Norm Quantiles", ylab = "Large Sample Quantiles")
+qqline(m_smp_large, col = 2)
+```
+
+**check: If Sample Median ~ T**
+```{r}
+mypar(1,2)
+qqplot(qt(ps, df = 10-1),m_smp_small, main=paste("Small Sample"),  
+       xlab = "T Quantiles (df = 9)", ylab = "Small Sample Quantiles")
+abline(0, 1, col = 2)
+qqplot(qt(ps, df = 100-1),m_smp_large, main=paste("Large Sample"),  
+       xlab = "T Quantiles (df = 99)", ylab = "Large Sample Quantiles")
+abline(0, 1, col = 2)
+```
+
+## Question 2:
+```{r}
+url <- "https://raw.githubusercontent.com/genomicsclass/dagdata/master/inst/extdata/babies.txt"
+filename <- basename(url)
+#download.file(url, destfile = filename)
+babies <- read.table("babies.txt", header = TRUE)
+bwt.nonsmoke <- filter(babies, smoke == 0) %>% select(bwt) %>% unlist
+bwt.smoke <- filter(babies, smoke == 1) %>% select(bwt) %>% unlist
+```
+
+```{r}
+N <- 10
+set.seed(1)
+nonsmokers <- sample(bwt.nonsmoke , N)
+smokers <- sample(bwt.smoke , N)
+obs <- mean(smokers) - mean(nonsmokers)
+```
+
+```{r}
+dat <- c(smokers,nonsmokers)
+shuffle <- sample( dat )
+smokersstar <- shuffle[1:N]
+nonsmokersstar <- shuffle[(N+1):(2*N)]
+mean(smokersstar) - mean(nonsmokersstar)
+```
+
+### 2-1.
+**Ans: p-value = 0.052**
+
+**Hypotheses**  
+We are interested in testing the following hypotheses:
+$$ H_{0}:\mu_{x} = \mu_{y} \\
+   H_{1}:\mu_{x} \neq \mu_{y} $$
+where $\mu_{x}$ and $\mu_{y}$ are the population mean of smoking and non-smoking groups, respectively.
+
+```{r}
+gen_diff_mean_permut <- function(){
+  shuffle <- sample(dat)
+  smokersstar <- shuffle[1:N]
+  nonsmokersstar <- shuffle[(N+1):(2*N)]
+  return(mean(smokersstar) - mean(nonsmokersstar))
+}
+set.seed(1)
+X_permut <- replicate(1000, gen_diff_mean_permut())
+```
+
+```{r}
+p_val <- mean(abs(X_permut) > abs(obs))
+round(p_val, 4)
+```
+
+### 2-2. Ans: p-value = 0.017
+**Hypotheses**  
+We are interested in testing the following hypotheses:
+$$ H_{0}:m_{x} = m_{y} \\
+   H_{1}:m_{x} \neq m_{y} $$
+where $m_{x}$ and $m_{y}$ are the population median of smoking and non-smoking groups, respectively.
+```{r}
+obs <- median(smokers) - median(nonsmokers)
+
+gen_diff_median_permut <- function(){
+  shuffle <- sample(dat)
+  smokersstar <- shuffle[1:N]
+  nonsmokersstar <- shuffle[(N+1):(2*N)]
+  return(median(smokersstar) - median(nonsmokersstar))
+}
+set.seed(1)
+X_permut <- replicate(1000, gen_diff_median_permut())
+```
+
+```{r}
+p_val <- mean(abs(X_permut) > abs(obs))
+round(p_val, 4)
+```
+
+## Question 3:
+### 3-1.
+**Ans: 5.9632**
+```{r}
+obs <- sd(smokers) - sd(nonsmokers)
+
+gen_diff_sd_bootstrap <- function(){
+  smokersstar <- sample(smokers, N, replace = TRUE)
+  nonsmokersstar <- sample(nonsmokers, N, replace = TRUE)
+  return(sd(smokersstar) - sd(nonsmokersstar))
+}
+set.seed(1)
+X_bootstrap <- replicate(1000, gen_diff_sd_bootstrap())
+```
+
+```{r}
+round(sd(X_bootstrap), 4)
+```
+
+```{r}
+round((obs - mean(X_bootstrap))/sd(X_bootstrap), 4)
+```
