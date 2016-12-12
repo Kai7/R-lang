@@ -1,0 +1,248 @@
+---
+title: "0556082_hwk03"
+author: "0556082"
+date: "11/20/2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("rafalib")
+#install.packages("dplyr")
+library(dplyr)
+library(rafalib)
+```
+
+## 1.1
+
+ans: 0.3008
+```{r}
+set.seed(1)
+generate_t <- function(n){
+    sample <- rnorm(n)
+  return (sqrt(n) * mean(sample) / sd(sample))
+
+}
+round(generate_t(5), 4)
+```
+
+## 1.2
+
+ans: 0.068
+```{r}
+set.seed(1)
+B <- 1000
+sample_t <- replicate(B, generate_t(5))
+round(mean(sample_t > 2), 4)
+```
+
+## 1.3
+
+ans: (C) The approximations are spot on for all sample sizes.
+```{r}
+N <- c(5, 10, 20, 50)
+B <- 100
+mypar(2,2)
+for(n in N){
+    ps <- seq(1/(B+1), 1-1/(B+1),len=B)
+  sample_t <- replicate(B, generate_t(n))
+    title <- paste0("N=", n)
+    qqplot(qt(ps, df=n-1), sample_t, main=title)
+      qqline(sample_t, col = 2)
+
+}
+```
+
+## 1.4
+
+ans: (C) The approximations are spot on for all sample sizes.
+```{r}
+generate_two_nor <- function(n){
+    x1 <- rnorm(n, 0, 1)
+  x2 <- rnorm(n, 0, 1)
+    tstat <- (mean(x1)-mean(x2)) /sqrt( var(x1)/n + var(x2)/n  ) 
+    return(tstat)
+
+}
+mypar(1, 2)
+B <- 100
+ps <- seq(1/(B+1), 1-1/(B+1),len=B)
+n <- 10
+small_x <- replicate(1000, generate_two_nor(n))
+title <- paste0("Small sample N=", n)
+qqplot(qt(ps, df = 2*n-2), small_x, main=title)
+abline(0, 1, col=2)
+
+n <- 1000
+large_x <- replicate(1000, generate_two_nor(n))
+title <- paste0("Large sample N=", n)
+qqplot(qt(ps, df = 2*n-2), large_x, main=title)
+abline(0, 1, col=2)
+```
+
+## 1.5
+
+ans: no
+```{r}
+generate_t_bi <- function(n){
+    X <- rbinom(n,size=1,prob=0.5)
+  tstat <- sqrt(n)*mean(X) / sd(X)
+    return (tstat)
+
+}
+n <- 15
+sample_t_bi <- replicate(1000, generate_t_bi(n))
+title <- paste0("N=", n)
+qqplot(qt(ps, df=n-1), sample_t_bi, main=title)
+qqline(sample_t_bi, col = 2)
+```
+
+## 1.6
+
+ans: yes
+```{r}
+n <- 500
+sample_t_bi <- replicate(1000, generate_t_bi(n))
+title <- paste0("N=", n)
+qqplot(qt(ps, df=n-1), sample_t_bi, main=title)
+qqline(sample_t_bi, col = 2)
+```
+
+## 1.7
+
+ans: (C)The sample median is t-distributed for small samples and normally distributed for large ones.
+```{r}
+generate_sample_median <- function(n){
+    sample_norm <- rnorm(n)
+  return (median(sample_norm))
+
+}
+set.seed(1)
+B <- 100
+ps <- seq(1/(B+1), 1-1/(B+1),len=B)
+small_sample_median <- replicate(1000, generate_sample_median(10))
+large_sample_median <- replicate(1000, generate_sample_median(1000))
+```
+
+### Compare with normal with mean 0 and SD 1/sqrt(N)
+```{r}
+mypar(1,2)
+title <- paste0("small")
+qqplot(qnorm(ps, 0, 1/sqrt(10)), small_sample_median, main=title)
+qqline(small_sample_median, col = 2)
+title <- paste0("large")
+qqplot(qnorm(ps, 0, 1/sqrt(1000)), large_sample_median, main=title)
+qqline(large_sample_median, col = 2)
+```
+
+### Compare with normal with mean 0 and SD 1
+```{r}
+mypar(1,2)
+title <- paste0("small")
+qqplot(qnorm(ps, 0, 1), small_sample_median, main=title)
+qqline(small_sample_median, col = 2)
+title <- paste0("large")
+qqplot(qnorm(ps, 0, 1), large_sample_median, main=title)
+qqline(large_sample_median, col = 2)
+```
+
+### Compare with t distribution
+```{r}
+mypar(1,2)
+title <- paste0("small")
+qqplot(qt(ps, df=9), small_sample_median, main=title)
+qqline(small_sample_median, col = 2)
+title <- paste0("large")
+qqplot(qt(ps, df=999), large_sample_median, main=title)
+qqline(large_sample_median, col= 2)
+```
+
+### Compare with normal with mean 0 and SD large than 1/sqrt(N)
+```{r}
+mypar(1,2)
+title <- paste0("small")
+qqplot(qnorm(ps, 0, 1/sqrt(10) + 1), small_sample_median, main=title)
+qqline(small_sample_median, col = 2)
+title <- paste0("large")
+qqplot(qnorm(ps, 0, 1/sqrt(1000) + 1), large_sample_median, main=title)
+qqline(large_sample_median, col = 2)
+```
+
+## 2 Set up
+
+```{r}
+url <- "https://raw.githubusercontent.com/genomicsclass/dagdata/master/inst/extdata/babies.txt"
+filename <- basename(url)
+download.file(url, destfile=filename)
+babies <- read.table("babies.txt", header=TRUE)
+bwt.nonsmoke <- filter(babies, smoke==0) %>% select(bwt) %>% unlist 
+bwt.smoke <- filter(babies, smoke==1) %>% select(bwt) %>% unlist
+```
+
+## 2.1
+
+ans: 0.053
+```{r}
+N=10
+set.seed(1)
+nonsmokers <- sample(bwt.nonsmoke , N)
+smokers <- sample(bwt.smoke , N)
+dat <- c(smokers,nonsmokers)
+obs <- mean(smokers) - mean(nonsmokers)
+
+permutation <- function() {
+    
+  shuffle <- sample( dat  )
+    smokersstar <- shuffle[1:N]
+    nonsmokersstar <- shuffle[(N+1):(2*N)]
+      return (mean(smokersstar)-mean(nonsmokersstar))
+
+}
+obs_permutation <- replicate(1000, permutation())
+p_value <- mean(abs(obs_permutation) > abs(obs))
+round(p_value, 4)
+```
+
+## 2.2
+
+ans: 0.017
+```{r}
+N=10
+set.seed(1)
+nonsmokers <- sample(bwt.nonsmoke , N)
+smokers <- sample(bwt.smoke , N)
+obs <- median(smokers) - median(nonsmokers)
+
+permutation <- function() {
+    dat <- c(smokers,nonsmokers)
+  shuffle <- sample( dat  )
+    smokersstar <- shuffle[1:N]
+    nonsmokersstar <- shuffle[(N+1):(2*N)]
+      return (median(smokersstar) - median(nonsmokersstar))
+
+}
+obs_permutation <- replicate(1000, permutation())
+p_value <- mean(abs(obs_permutation) > abs(obs))
+round(p_value, 4)
+```
+
+## 3
+
+ans: 6.513
+```{r}
+N=10
+set.seed(1)
+nonsmokers <- sample(bwt.nonsmoke , N)
+smokers <- sample(bwt.smoke , N)
+obs <- sd(smokers) - sd(nonsmokers)
+
+set.seed(1)
+bootstrap <- function(){
+    nonsmokers <- sample(bwt.nonsmoke , N, replace = TRUE)
+  smokers <- sample(bwt.smoke , N, replace = TRUE)
+    return (sd(smokers) - sd(nonsmokers))
+
+}
+bootstrap_sd <- replicate(1000, bootstrap())
+round(sd(bootstrap_sd), 4)
+```
