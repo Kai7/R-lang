@@ -1,0 +1,218 @@
+---
+title: 'Lecture 14: Clustering'
+output: html_document
+date: "2016/12/14"
+---
+
+# Clustering
+
+## RMD_example 14.1: Read 照片分群 (pictcluster.csv)
+
+```{r}
+# Get the file url for the data
+fileurl = "http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/pictcluster.csv"
+# Import the csv file into R
+#   Note: stringsAsFactors=TRUE will screw up conversion to numeric!
+pictcluster<-read.csv(fileurl, header=TRUE, stringsAsFactors=FALSE)
+#   Note: read.csv treats the 1st column of pictcluster as the data, not the rownames, we have to correct this 
+#         Get the 1st column as the rownames
+names1<-pictcluster[,1]
+#         Remove the 1st column from pictcluster
+pictcluster<-pictcluster[,-1]
+#         Assign the rownames
+rownames(pictcluster)<-names1
+colnames(pictcluster)
+dim(pictcluster)
+
+# 將上傳時間做轉換，以"天數"為單位，並相較於最早上傳的時間，計算出每筆資料與最早上傳的時間差
+pictcluster[,c("上傳時間")]<-pictcluster[,c("上傳時間")]*10^8
+t0<-as.POSIXlt(as.numeric(min(pictcluster[,c("上傳時間")])), origin="1970-01-01", tz="GMT")
+tt<-as.POSIXlt(as.numeric(pictcluster[,c("上傳時間")]), origin="1970-01-01", tz="GMT")
+pictcluster[,c("上傳時間")]<-as.numeric(difftime(tt, t0, unit="day"))
+
+head(pictcluster)
+```
+
+## RMD_example 14.2: Agglomerative hierarchical clustering
+
+```{r}
+# Distance matrix between the rows of a data matrix
+da<-dist(pictcluster, method="euclidean")
+# Perform agglomerative hierarchical clustering with complete linkage
+fita<-hclust(da, method="complete")
+# Display dendogram (with labels at the same level)
+plot(fita, label=rownames(pictcluster), hang=-1)
+# Cut tree into 4 clusters
+cutree(fita, k=4)
+# Draw dendogram with red borders around the 4 clusters
+rect.hclust(fita, k=4, border="red")
+```
+
+## RMD_example 14.3: Divisive hierarchical clustering
+
+```{r}
+# Install package "cluster" first, then load it into R
+library(cluster)
+# Distance matrix between the rows of a data matrix
+dd<-dist(pictcluster, method="euclidean")
+# Perform divisive hierarchical clustering
+fitd<-diana(dd, diss=T)
+# Display dendogram
+plot(fitd)
+# Cut tree into 4 clusters
+cutree(fitd, k=4)
+# Draw dendogram with red borders around the 4 clusters
+rect.hclust(fitd, k=4, border="red")
+```
+
+## RMD_example 14.4: Heatmap
+
+```{r}
+# No dendrogram
+heatmap(as.matrix(pictcluster), Rowv=NA, Colv=NA,
+        xlab="變數", ylab="相片ID",
+        cexRow=1, cexCol=1)
+# With dendrogram
+heatmap(as.matrix(pictcluster),
+        xlab="變數", ylab="相片ID",
+        cexRow=1, cexCol=1)
+# With different color schemes
+#   Install package "RColorBrewer" first, then load it into R
+library(RColorBrewer)
+
+heatmap(as.matrix(pictcluster), col=brewer.pal(9, "BuGn"),
+        xlab="變數", ylab="相片ID",
+        cexRow=1, cexCol=1)
+
+# Use heatmap.2 and self-set dendrogram
+#   Install packages "graphics", "gplots" and "RColorBrewer" first, then load them into R
+library(graphics)
+library(gplots)
+library(RColorBrewer)
+
+hcpict <- hclust(dist(pictcluster), method="complete")
+dendpict <- as.dendrogram(hcpict)
+hcvar <- hclust(as.dist(1-cor(pictcluster)), method="complete")
+dendvar <- as.dendrogram(hcvar)
+
+#   Create a blue -> purple colour palette
+jBuPuFun <- colorRampPalette(brewer.pal(n = 9, "BuPu"))
+paletteSize <- 256
+jBuPuPalette <- jBuPuFun(paletteSize)
+
+heatmap.2(as.matrix(pictcluster), Rowv=dendpict, Colv=dendvar, col=jBuPuPalette,
+          xlab="變數", ylab="相片ID", scale="none", trace="none",
+          cexRow=1, cexCol=1, density.info="none")
+```
+
+## RMD_example 14.5: K-means clustering 
+
+```{r}
+# 4 cluster solution
+fitk<-kmeans(pictcluster, centers=4)
+# Clustering results
+fitk$cluster
+# Get cluster means
+aggregate(pictcluster, by=list(fitk$cluster), FUN=mean)
+```
+
+## RMD_example 14.6: K-medoids clustering 
+
+```{r}
+# Install package "cluster" first, then load it into R
+library(cluster)
+# Distance matrix between the rows of a data matrix
+dp<-dist(pictcluster, method="euclidean")
+# 4 cluster solution
+fitp<-pam(dp, k=4, diss=T)
+# Clustering results
+fitp$cluster
+# Get cluster means
+aggregate(pictcluster, by=list(fitp$cluster), FUN=mean)
+```
+
+## RMD_example 14.7: Determine number of clusters
+
+```{r}
+wss<-(nrow(pictcluster)-1)*sum(apply(pictcluster,2,var))
+for (i in 2:15) wss[i]<-sum(kmeans(pictcluster, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="number of clusters",
+     ylab="within clusters sum of squares")
+```
+
+## RMD_example 14.8: Silhouette plot
+
+Silhouette plot can be used to assess cluster fit. Fisrt let do the silhouette plot for agglomerative hierarchical clustering.
+
+```{r}
+# Install package "cluster" first, then load it into R
+library(cluster)
+
+# Agglomerative hierarchical clustering
+da<-dist(pictcluster, method="euclidean")
+fita<-hclust(da, method="complete")
+cuta<-cutree(fita, k=4)
+
+# Silhouette plot
+sia<-silhouette(cuta, da)
+plot(sia)
+#   with cluster-wise coloring
+plot(sia, col=c("red", "green", "blue", "purple"))
+```
+
+Draw the silhouette plot for divisive hierarchical clustering.
+
+```{r}
+# Divisive hierarchical clustering
+dd<-dist(pictcluster, method="euclidean")
+fitd<-diana(dd, diss=T)
+cutd<-cutree(fitd, k=4)
+
+# Silhouette plot
+sid<-silhouette(cutd, dd)
+plot(sid, col=c("red", "green", "blue", "purple"))
+```
+
+Draw the silhouette plot for k-means clustering.
+
+```{r}
+# K-means clustering
+dk<-dist(pictcluster, method="euclidean")
+fitk<-kmeans(pictcluster, centers=4)
+
+# Silhouette plot
+sik<-silhouette(fitk$cluster, dk)
+plot(sik, col=c("red", "green", "blue", "purple"))
+```
+
+Draw the silhouette plot for k-medoids clustering.
+
+```{r}
+# K-medoids clustering
+dp<-dist(pictcluster, method="euclidean")
+fitp<-pam(dp, k=4, diss=T)
+
+# Silhouette plot
+sip<-silhouette(fitp, dp)
+plot(sip, col=c("red", "green", "blue", "purple"))
+```
+
+# Multidimensional scaling
+
+## RMD_example 14.9: Multidimensional scaling
+
+```{r}
+# Euclidean distances between the rows
+dM<-dist(pictcluster, method="euclidean")
+# MDS
+fitM<-cmdscale(dM, eig=T, k=2) # k is the number of dim
+fitM # view results
+
+# Plot solution 
+x <- fitM$points[,1]
+y <- fitM$points[,2]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2", 
+     main="Metric MDS",	type="n")
+text(x, y, labels=row.names(pictcluster), cex=1)
+```
+

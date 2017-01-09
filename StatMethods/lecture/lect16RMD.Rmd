@@ -1,0 +1,142 @@
+---
+title: 'Lecture 1: Machine learning'
+output: html_document
+date: "2016/12/28"
+---
+
+## RMD_example 16.1: Read 部落格分類 data
+
+```{r}
+# Get the file url for training data
+fileurl = 'http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/blogtrain.csv'
+# Import the csv file into R
+#   note: stringsAsFactors=TRUE will screw up conversion to numeric!
+blogtrain<-read.csv(fileurl, header=TRUE, stringsAsFactors=FALSE)
+#   note: read.csv treats the 1st column of blogtrain.csv as the data, not the rownames,
+#         we have to correct this
+#         get the 1st column as the rownames
+names1<-blogtrain[,1]
+#         remove the 1st column from blogtrain
+blogtrain<-blogtrain[,-1]
+#         assign the rownames
+rownames(blogtrain)<-names1
+colnames(blogtrain)
+dim(blogtrain)
+head(blogtrain)
+
+# Get the file url for testing data
+fileurl = 'http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/blogtest.csv'
+# Import the csv file into R
+#   note: stringsAsFactors=TRUE will screw up conversion to numeric!
+blogtest<-read.csv(fileurl, header=TRUE, stringsAsFactors=FALSE)
+#   note: read.csv treats the 1st column of blogtest.csv as the data, not the rownames,
+#         we have to correct this
+#         get the 1st column as the rownames
+names2<-blogtest[,1]
+#         remove the 1st column from blogtest
+blogtest<-blogtest[,-1]
+#         assign the rownames
+rownames(blogtest)<-names2
+colnames(blogtest)
+dim(blogtest)
+head(blogtest)
+```
+
+## RMD_example 16.2: Support vector machine (SVM)
+
+```{r}
+# Install package "e1071" first, then load it into R
+library(e1071)
+
+# Scale variables before doing SVM
+blogtrain_s <- blogtrain
+blogtest_s <- blogtest
+
+scaled1 <- scale(blogtrain[,-5])
+blogtrain_s[,-5] <- as.data.frame(scaled1)
+scaled2 <- scale(blogtest[,-5], center=attr(scaled1,"scaled:center"), scale=attr(scaled1,"scaled:scale"))
+blogtest_s[,-5] <- as.data.frame(scaled2)
+
+# Create model formula with all variables as predictors
+xname<-colnames(blogtrain_s)[-5]
+(fmla <- as.formula(paste("as.factor(cateid) ~ ", paste(xname, collapse= "+"))))
+
+# Fit SVM with different kernels and assess the accuracy of the prediction from 10-fold cross-validation
+fitsvml <- svm(fmla, kernel="linear", cross=10, data=blogtrain_s)
+summary(fitsvml)
+
+fitsvmp <- svm(fmla, kernel="polynomial", cross=10, data=blogtrain_s)
+summary(fitsvmp)
+
+fitsvmr <- svm(fmla, kernel="radial", cross=10, data=blogtrain_s)
+summary(fitsvmr)
+
+fitsvms <- svm(fmla, kernel="sigmoid", cross=10, data=blogtrain_s)
+summary(fitsvms)
+
+# Test with training data (for radial kernel)
+predsvmr <- predict(fitsvmr, blogtrain_s[,-5])
+#   the same as:
+predsvmr <- fitted(fitsvmr)
+#   check accuracy
+table(blogtrain_s$cateid, predsvmr)
+
+# Assess the accuracy of the prediction using the independent testing set `blogtest_s` (for radial kernel)
+btest <- blogtest_s[,-5]
+predsvmrtest <- predict(fitsvmr, btest)
+table(blogtest_s$cateid, predsvmrtest)
+
+# Plot decision boundary on two selected variables (for radial kernel)
+plot(fitsvmr, blogtrain_s, commentscount~articlescount, color.palette=terrain.colors)
+
+plot(fitsvmr, blogtrain_s, usagedays~subscribercount, color.palette=terrain.colors)
+```
+
+## RMD_example 16.3: Neural network
+
+```{r}
+# Install package "neuralnet" first, then load it into R
+library(neuralnet)
+
+# Scale variables before doing neural network
+blogtrain_s <- blogtrain
+blogtest_s <- blogtest
+
+scaled1 <- scale(blogtrain[,-5])
+blogtrain_s[,-5] <- as.data.frame(scaled1)
+scaled2 <- scale(blogtest[,-5], center=attr(scaled1,"scaled:center"), scale=attr(scaled1,"scaled:scale"))
+blogtest_s[,-5] <- as.data.frame(scaled2)
+
+# commentscount, articlescount, usagedays, subscribercount are the input nodes, cateid is the output node.
+# Because cateid is a factor (values:0,1,2), neural network model cannot handle it directly.
+# We need to transfer cateid as dummy variables.
+a0<-(blogtrain_s$cateid==0)
+a1<-(blogtrain_s$cateid==1)
+a2<-(blogtrain_s$cateid==2)
+
+# Create model formula with all variables as predictors
+xname<-colnames(blogtrain_s)[1:4]
+(fmla <- as.formula(paste("a0+a1+a2 ~ ", paste(xname, collapse= "+"))))
+
+# Fit the neural network model
+#  the argument `hidden`  accepts a vector with the number of nodes (neurons) for each hidden layer
+#    (e.g., 1 hidden layer with 2 nodes: hidden=c(2)
+#           2 hidden layers with 1 and 2 nodes, respectively: hidden=c(1, 2))
+fitnn <- neuralnet(fmla, data=blogtrain_s, hidden=c(1))
+
+print(fitnn$weights)
+print(fitnn$result.matrix)
+
+# Plot the resulting network
+#  In the plot, the black lines show the connections between each layer and the weights 
+#  on each connection, while the blue lines show the bias term added in each step. 
+#  The bias can be thought as the intercept of a linear model.
+plot(fitnn)
+
+# Assess the accuracy of the prediction using the independent testing set `blogtest_s` 
+btest <- blogtest_s[,-5]
+prednn <- compute(fitnn, btest)
+prednn
+apply(prednn$net.result, 1, which.max)
+```
+

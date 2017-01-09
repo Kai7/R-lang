@@ -1,0 +1,158 @@
+---
+title: 'Lecture 15: Classification'
+output: html_document
+date: "2016/12/21"
+---
+
+# Classification
+
+## RMD_example 15.1: Read 部落格分類 data
+
+```{r}
+# Get the file url for training data
+fileurl = 'http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/blogtrain.csv'
+# Import the csv file into R
+#   note: stringsAsFactors=TRUE will screw up conversion to numeric!
+blogtrain<-read.csv(fileurl, header=TRUE, stringsAsFactors=FALSE)
+#   note: read.csv treats the 1st column of blogtrain.csv as the data, not the rownames,
+#         we have to correct this
+#         get the 1st column as the rownames
+names1<-blogtrain[,1]
+#         remove the 1st column from blogtrain
+blogtrain<-blogtrain[,-1]
+#         assign the rownames
+rownames(blogtrain)<-names1
+colnames(blogtrain)
+dim(blogtrain)
+head(blogtrain)
+
+# Get the file url for testing data
+fileurl = 'http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/blogtest.csv'
+# Import the csv file into R
+#   note: stringsAsFactors=TRUE will screw up conversion to numeric!
+blogtest<-read.csv(fileurl, header=TRUE, stringsAsFactors=FALSE)
+#   note: read.csv treats the 1st column of blogtest.csv as the data, not the rownames,
+#         we have to correct this
+#         get the 1st column as the rownames
+names2<-blogtest[,1]
+#         remove the 1st column from blogtest
+blogtest<-blogtest[,-1]
+#         assign the rownames
+rownames(blogtest)<-names2
+colnames(blogtest)
+dim(blogtest)
+head(blogtest)
+```
+
+## RMD_example 15.2: Linear discriminant analysis (LDA)
+
+We firt "train" the model using `blogtrain`.
+
+```{r}
+# Install package "MASS" first, then load it into R
+library(MASS)
+
+# Create model formula with all variables as predictors
+xname<-colnames(blogtrain)[-5]
+(fmla <- as.formula(paste("as.factor(cateid) ~ ", paste(xname, collapse= "+"))))
+fitlda<-lda(fmla, prior=c(1/3,1/3,1/3), data=blogtrain, na.action="na.omit")
+
+# Show the results
+fitlda
+```
+
+We can plot each observation in the space of the first 2 linear discriminants using the following codes. Points are identified with the class label.
+
+```{r}
+plot(fitlda)
+```
+
+A nice way of displaying the results of a LDA is to make a stacked histogram of the values of the discriminant function for the objects from different classes.
+
+We can do this using the `ldahist()` function in R. For example, to make a stacked histogram of the 1st discriminant function’s values for objects of the three different `catei` classes, we type:
+
+```{r}
+lda.pred <- predict(fitlda)
+ldahist(lda.pred$x[,1], g=blogtrain$cateid, type="both")
+```
+
+A stacked histogram of the 2nd discriminant function’s values for objects of the three different `catei` classes:
+
+```{r}
+ldahist(lda.pred$x[,2], g=blogtrain$cateid, type="both")
+```
+
+The `partimat( )` function in the `klaR` package can display the results of a linear classifications 2 variables at a time.
+
+```{r}
+# Install package "klaR" first, then load it into R
+library(klaR)
+partimat(fmla, data=blogtrain, method="lda")
+```
+
+Assess the accuracy of the prediction from leave-one-out cross-validation
+
+```{r}
+fitldac<-lda(fmla, prior=c(1/3,1/3,1/3), data=blogtrain, na.action="na.omit", CV=TRUE)
+ct<-table(blogtrain$cateid, fitldac$class)
+ct
+
+# Total percent correct from leave-one-out cross-validation
+sum(diag(prop.table(ct)))
+```
+
+Then, assess the accuracy of the prediction using the independent testing set `blogtest`
+
+```{r}
+fitlda<-lda(fmla, prior=c(1/3,1/3,1/3), data=blogtrain, na.action="na.omit")
+btest<-blogtest[,-5]
+testcl<-predict(fitlda, btest)$class
+testcl
+cttl<-table(blogtest$cateid, testcl)
+cttl
+
+# Total percent correct from the testing set
+sum(diag(prop.table(cttl)))
+```
+
+## RMD_example 15.3: Quadratic discriminant analysis (QDA)
+
+"Train" the model using `blogtrain`.
+
+```{r}
+# Create model formula with all variables as predictors
+xname<-colnames(blogtrain)[-5]
+(fmla <- as.formula(paste("as.factor(cateid) ~ ", paste(xname, collapse= "+"))))
+fitqda<-qda(fmla, prior=c(1/3,1/3,1/3), data=blogtrain, na.action="na.omit")
+
+# Show the results
+fitqda
+
+# Display the results of a quadratic classifications 2 variables at a time.
+#   Install package "klaR" first, then load it into R
+library(klaR)
+partimat(fmla, data=blogtrain, method="qda")
+
+# Assess the accuracy of the prediction from leave-one-out cross-validation
+fitqdac<-qda(fmla, prior=c(1/3,1/3,1/3), data=blogtrain, na.action="na.omit", CV=TRUE)
+ct<-table(blogtrain$cateid, fitqdac$class)
+ct
+
+# Total percent correct from leave-one-out cross-validation
+sum(diag(prop.table(ct)))
+```
+
+Assess the accuracy of the prediction using the independent testing set `blogtest`
+
+```{r}
+fitqda<-qda(fmla, prior=c(1/3,1/3,1/3), data=blogtrain, na.action="na.omit")
+btest<-blogtest[,-5]
+testcq<-predict(fitqda, btest)$class
+testcq
+cttq<-table(blogtest$cateid, testcq)
+cttq
+
+# Total percent correct from the testing set
+sum(diag(prop.table(cttq)))
+```
+

@@ -1,0 +1,159 @@
+---
+title: 'Lecture 17: Machine learning: classification and regression tree & K-nearest neighbor'
+output: html_document
+date: "2017/1/4"
+---
+
+## RMD_example 17.1: Read 六都房地產實價登錄資料 (house.csv)
+
+```{r}
+# Get the file url
+fileurl <- "http://ghuang.stat.nctu.edu.tw/course/statmethods16/files/data/house.csv"
+
+# Import the csv file into R
+#   note: stringsAsFactors=TRUE will screw up conversion to numeric!
+house <- read.csv(fileurl, header=TRUE, stringsAsFactors=FALSE)
+
+dim(house)
+head(house)
+
+# Unify the data type of used variables
+house[,"每平方公尺單價"] <- as.numeric(house[,"每平方公尺單價"])
+house[,"區域"] <- as.factor(house[,"區域"])
+house[,"車位"] <- as.factor(house[,"車位"])
+house[,"屋齡"] <- as.numeric(house[,"屋齡"])
+house[,"主要用途"] <- as.factor(house[,"主要用途"])
+house[,"建物型態"] <- as.factor(house[,"建物型態"])
+house[,"有無管理組織"] <- as.factor(house[,"有無管理組織"])
+
+str(house[,c("每平方公尺單價","區域","車位","屋齡","主要用途","建物型態","有無管理組織")])
+
+# Randomly select 250 observations for CART, where 50 as the testing set and the rest as the training set
+selected <- sample(1:dim(house)[1], size=250)
+housesel <- house[selected,]
+selectedt <- sample(1:dim(housesel)[1], size=50)
+
+housetrain <- housesel[-selectedt,]
+housetest <- housesel[selectedt,]
+
+#  the distribution in 區域 of the testing set
+table(housetest[,"區域"])
+```
+
+## RMD_example 17.2: Regression tree
+
+```{r}
+# Install packages "rpart", "rpart.plot" first, then load them into R
+library(rpart)
+library(rpart.plot)
+
+# Grow regression trees
+#  arguments:
+#   cp: complexity parameter. Any split that does not decrease the overall lack of fit by 
+#       a factor of cp is not attempted. 
+#       Used to choose depth of the tree, we'll manually prune the tree later and 
+#       hence can set the threshold very low.
+#   method: "anova" for regression tree, "class" for classification tree
+
+#  log-transform每平方公尺平均單價so that its distribution has more of a typical bell-shape
+fmla <- as.formula("log(每平方公尺單價) ~ 區域+車位+屋齡+主要用途+建物型態+有無管理組織")
+fittree <- rpart(fmla, data=housetrain, method="anova", cp=10^(-5))
+
+# Display the CP table
+printcp(fittree)
+
+# Visualize cross-validation results
+plotcp(fittree)
+
+# Prune the tree to 8 splits
+cp8 <- which(fittree$cptable[,"nsplit"] == 8)
+fittree8 <- prune(fittree, cp=fittree$cptable[cp8,1])
+
+# Plot tree using package rpart.plot
+prp(fittree8, faclen=-3, extra=1, cex=.8, main="CART- 8 splits")
+
+# Prune the tree using the best cp (i.e., the cp with the smallest cross-validation error (xerror))
+bestcp <- fittree$cptable[which.min(fittree$cptable[,"xerror"]),"CP"]
+fittreebest <- prune(fittree, cp=bestcp)
+
+# Plot tree using package rpart.plot
+prp(fittreebest, faclen=-3, extra=1, cex=.8, main="CART- best cp")
+
+# Exporting the results of fittree8
+
+#  frame is a matrix with 1 row per node of the tree
+#   row name corresponds to a unique node index
+#   var - name of the variable used in the split, or <leaf>
+#   n - number of observations reaching the node
+#   yval - the fitted outcome value at the node
+fittree8$frame
+
+# Assess the accuracy of the prediction using the independent testing set `housetest` (for fittree8)
+xname <- c("區域","車位","屋齡","主要用途","建物型態","有無管理組織")
+predtree8 <- predict(fittree8, housetest[,xname])
+#  root mean square error (RMSE) of the prediction
+sqrt(sum((log(housetest[,"每平方公尺單價"])-predtree8)^2))
+```
+
+## RMD_example 17.3: Classification tree
+
+```{r}
+# Install packages "rpart", "rpart.plot" first, then load them into R
+library(rpart)
+library(rpart.plot)
+
+# Grow classification trees
+#  arguments:
+#   cp: complexity parameter. Any split that does not decrease the overall lack of fit by 
+#       a factor of cp is not attempted. 
+#       Used to choose depth of the tree, we'll manually prune the tree later and 
+#       hence can set the threshold very low.
+#   method: "anova" for regression tree, "class" for classification tree
+fmlac <- as.formula("區域 ~ 每平方公尺單價+車位+屋齡+主要用途+建物型態+有無管理組織")
+fittreec <- rpart(fmlac, data=housetrain, method="class", cp=10^(-5))
+
+# Display the CP table
+printcp(fittreec)
+
+# Visualize cross-validation results
+plotcp(fittreec)
+
+# Prune the tree using the best cp (i.e., the cp with the smallest cross-validation error (xerror))
+cbestcp <- fittreec$cptable[which.min(fittreec$cptable[,"xerror"]),"CP"]
+fittreecbest <- prune(fittreec, cp=cbestcp)
+
+# Plot tree using package rpart.plot
+levels(housetrain[,"區域"])
+prp(fittreecbest, faclen=-3, extra=1, cex=.8, main="CART- best cp")
+
+# Assess the accuracy of the prediction using the independent testing set `housetest` (for fittreecbest)
+xname <- c("每平方公尺單價","車位","屋齡","主要用途","建物型態","有無管理組織")
+predtreec <- predict(fittreecbest, housetest[,xname])
+predtreec_Class <- apply(predtreec, 1, function(one_row) return(colnames(predtreec)[which(one_row == max(one_row))]))
+table(housetest[,"區域"], predtreec_Class)
+```
+
+## RMD_example 17.4: K-nearest neighbour classification
+
+```{r}
+# Install package "class" first, then load it into R
+library(class)
+
+# In train and test, only numeric variables are allowed 
+xname <- c("區域","每平方公尺單價","屋齡")
+
+# NA's are not allowed in knn. Delete all observations with NA.
+btrain <- housetrain[,xname]
+for (i in 1:length(xname)) btrain <- btrain[!is.na(btrain[,i]),]
+btest <- housetest[,xname]
+for (i in 1:length(xname)) btest <- btest[!is.na(btest[,i]),]
+
+fitknn <- knn(train=btrain[,-1], test=btest[,-1], cl=btrain[,"區域"], k=5, prob=T)
+
+# Print out results
+attributes(fitknn)
+
+# Assess the accuracy of the prediction
+table(btest[,"區域"], fitknn)
+```
+
